@@ -1,0 +1,189 @@
+
+import { GoogleGenAI, Modality } from "@google/genai";
+import { CreateFunction, EditFunction, ImageFile, OrthoView, AspectRatio } from '../types';
+
+if (!process.env.API_KEY) {
+    throw new Error("API_KEY environment variable is not set.");
+}
+
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const getAugmentedPrompt = (prompt: string, func: CreateFunction, view: OrthoView = 'front'): string => {
+    switch (func) {
+        case CreateFunction.Sticker:
+            return `A die-cut sticker of ${prompt}, vibrant colors, high contrast, isolated on a white background.`;
+        case CreateFunction.Text:
+            return `A typographic logo design for "${prompt}", clean, modern, vector style, high resolution.`;
+        case CreateFunction.Comic:
+            return `A comic book panel illustration of ${prompt}, in a dynamic, action-packed style with bold lines and vibrant colors, speech bubbles if necessary.`;
+        case CreateFunction.Skeleton:
+            const basePrompt = `Professional character design sheet for a 3D model of '${prompt}'. Masterpiece quality, 8k resolution, ultra-detailed, and intricately designed. The character is depicted in full body, vibrant color with cinematic lighting, emphasizing detailed textures and materials. The style should be a high-quality digital painting, suitable for concept art trending on ArtStation. The character must be in a perfect T-pose (arms straight out to the sides, parallel to the ground) with hands open and palms flat, fingers straight and held close together (but not touching), with palms facing completely downwards. The legs should be in a neutral A-pose (feet slightly apart). The view is an orthographic projection isolated on a pure white background with no shadows, ideal for 3D modeling reference.`;
+            switch(view) {
+                case 'front':
+                    return `${basePrompt} Front view.`;
+                case 'back':
+                    return `${basePrompt} Back view.`;
+                case 'side_left':
+                    return `${basePrompt} Left side view.`;
+                case 'side_right':
+                    return `${basePrompt} Right side view.`;
+                default:
+                    return `${basePrompt} Front view.`;
+            }
+        case CreateFunction.Free:
+        default:
+            return prompt;
+    }
+}
+
+export const generateImageApi = async (prompt: string, createFunction: CreateFunction, view: OrthoView | undefined, aspectRatio: AspectRatio, image: ImageFile | null): Promise<string> => {
+    if (createFunction === CreateFunction.Miniature) {
+        if (!image) {
+            throw new Error("Para a função Miniatura, é necessário enviar uma imagem.");
+        }
+
+        // Etapa 1: Identificar o modelo na imagem para melhorar o prompt
+        const identifyPrompt = "Identifique o modelo principal nesta imagem (ex: carro, personagem, objeto). Responda apenas com o nome do modelo, de forma curta e descritiva.";
+        const identifyResponse = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: {
+                parts: [
+                    { inlineData: { data: image.base64, mimeType: image.mimeType } },
+                    { text: identifyPrompt }
+                ]
+            },
+        });
+        
+        const modelName = identifyResponse.text.trim() || 'modelo da imagem'; // Fallback
+
+        // Etapa 2: Gerar a imagem da miniatura com o nome do modelo identificado
+        const miniatureBasePrompt = `INSTRUÇÃO CRÍTICA: A imagem final DEVE OBRIGATORIAMENTE ter uma proporção de 16:9 (widescreen). Esta é a regra mais importante. Crie uma miniatura comercial em escala 1/7 de um(a) **${modelName}**, baseado(a) na imagem fornecida, em estilo realista, em um ambiente real. A estatueta é colocada sobre uma mesa de computador. A miniatura tem uma base redonda de acrílico transparente, sem texto na base. O conteúdo na tela do computador é o processo de modelagem zbrush desta miniatura. Ao lado da tela do computador, há uma caixa de embalagem de brinquedo estilo BANDAI impressa com a arte original. A embalagem apresenta ilustrações planas bidimensionais. Lembre-se, a proporção da imagem DEVE ser 16:9.`;
+        
+        const finalPrompt = prompt ? `${miniatureBasePrompt}\n\nDetalhes adicionais do usuário: ${prompt}` : miniatureBasePrompt;
+        
+        const imageGenParts: any[] = [
+            { inlineData: { data: image.base64, mimeType: image.mimeType } },
+            { text: finalPrompt }
+        ];
+
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image-preview',
+            contents: { parts: imageGenParts },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+
+        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content && response.candidates[0].content.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+                }
+            }
+        }
+        throw new Error('A API não retornou uma imagem para a função Miniatura. Tente novamente.');
+    }
+    
+    // Default image generation logic
+    const augmentedPrompt = getAugmentedPrompt(prompt, createFunction, view);
+    const response = await ai.models.generateImages({
+        model: 'imagen-4.0-generate-001',
+        prompt: augmentedPrompt,
+        config: {
+            numberOfImages: 1,
+            outputMimeType: 'image/png',
+            aspectRatio: aspectRatio,
+        },
+    });
+
+    if (response.generatedImages && response.generatedImages.length > 0) {
+        const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+        return `data:image/png;base64,${base64ImageBytes}`;
+    }
+
+    throw new Error("Image generation failed or returned no images.");
+};
+
+const skeletonFromImageBasePrompt = `Using the provided image as a reference, transform the character into a professional character design sheet for a 3D model. Masterpiece quality, 8k resolution, ultra-detailed, and intricately designed. The character must be depicted in full body, vibrant color with cinematic lighting, emphasizing detailed textures and materials. The style should be a high-quality digital painting, suitable for concept art trending on ArtStation. The character must be in a perfect T-pose (arms straight out to the sides, parallel to the ground) with hands open and palms flat, fingers straight and held close together (but not touching), with palms facing completely downwards. The legs should be in a neutral A-pose (feet slightly apart). The view is an orthographic projection isolated on a pure white background with no shadows, ideal for 3D modeling reference.`;
+
+const getSkeletonFromImageViewPrompt = (view: OrthoView = 'front'): string => {
+    switch(view) {
+        case 'front':
+            return `${skeletonFromImageBasePrompt} Front view.`;
+        case 'back':
+            return `${skeletonFromImageBasePrompt} Back view.`;
+        case 'side_left':
+            return `${skeletonFromImageBasePrompt} Left side view.`;
+        case 'side_right':
+            return `${skeletonFromImageBasePrompt} Right side view.`;
+        default:
+            return `${skeletonFromImageBasePrompt} Front view.`;
+    }
+}
+
+export const transformImageToSkeletonApi = async (sourceImage: ImageFile, view: OrthoView): Promise<string> => {
+    const prompt = getSkeletonFromImageViewPrompt(view);
+    
+    const parts: any[] = [
+        { inlineData: { data: sourceImage.base64, mimeType: sourceImage.mimeType } },
+        { text: prompt }
+    ];
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: { parts },
+        config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+    });
+
+    if (response.candidates && response.candidates.length > 0 && response.candidates[0].content && response.candidates[0].content.parts) {
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const base64ImageBytes: string = part.inlineData.data;
+                return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+            }
+        }
+    }
+
+    throw new Error('A API não retornou uma imagem. Tente novamente.');
+};
+
+
+export const editImageApi = async (prompt: string, editFunction: EditFunction, image1: ImageFile | null, image2: ImageFile | null): Promise<string> => {
+    if (!image1) {
+        throw new Error("Primary image is required for editing.");
+    }
+    
+    const parts: any[] = [{
+      inlineData: { data: image1.base64, mimeType: image1.mimeType }
+    }];
+
+    if (editFunction === EditFunction.Compose && image2) {
+        parts.push({
+            inlineData: { data: image2.base64, mimeType: image2.mimeType }
+        });
+    }
+
+    parts.push({ text: prompt });
+    
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash-image-preview',
+        contents: { parts },
+        config: {
+            responseModalities: [Modality.IMAGE, Modality.TEXT],
+        },
+    });
+
+    if (response.candidates && response.candidates.length > 0 && response.candidates[0].content && response.candidates[0].content.parts) {
+        for (const part of response.candidates[0].content.parts) {
+            if (part.inlineData) {
+                const base64ImageBytes: string = part.inlineData.data;
+                return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+            }
+        }
+    }
+
+    throw new Error('A API não retornou uma imagem. Tente novamente.');
+};
