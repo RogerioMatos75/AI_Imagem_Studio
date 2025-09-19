@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Mode, CreateFunction, EditFunction, ImageFile, AspectRatio } from '../types';
 import { FunctionCard } from './FunctionCard';
@@ -31,6 +30,8 @@ const createFunctions = [
     { key: CreateFunction.Comic, icon: "💭", name: "HQ" },
     { key: CreateFunction.Skeleton, icon: "💀", name: "Esqueleto 3D" },
     { key: CreateFunction.Miniature, icon: "🧸", name: "Miniatura" },
+    { key: CreateFunction.Colmap, icon: "🧊", name: "Colmap" },
+    { key: CreateFunction.Animate, icon: "🎬", name: "Animar Cena" },
 ];
 
 const editFunctions = [
@@ -82,9 +83,18 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
     };
 
     const isMiniature = mode === Mode.Create && createFunction === CreateFunction.Miniature;
+    const isColmap = mode === Mode.Create && createFunction === CreateFunction.Colmap;
+    const isAnimate = mode === Mode.Create && createFunction === CreateFunction.Animate;
+
     const placeholderText = isMiniature
         ? "O modelo será identificado automaticamente. Adicione detalhes opcionais (ex: cores específicas, marcas)..."
+        : isColmap
+        ? "Apenas a imagem de referência é necessária. O prompt é predefinido para esta função."
+        : isAnimate
+        ? "O prompt de vídeo é predefinido. Adicione detalhes opcionais para customizar a cena..."
         : "Descreva a imagem ou modelo que você deseja criar...";
+        
+    const isPromptDisabled = isColmap; // Keep prompt enabled for Animate for optional details
 
     return (
         <div className="left-panel w-full md:w-1/3 bg-gray-800 p-6 flex flex-col space-y-4 md:overflow-y-auto md:h-screen">
@@ -109,15 +119,16 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                 <div className="section-title font-semibold text-gray-300 mb-2">💭 Descreva sua ideia</div>
                 <textarea
                     id="prompt"
-                    className="prompt-input w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition duration-200 h-28 resize-none"
+                    className="prompt-input w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:outline-none transition duration-200 h-28 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
                     placeholder={placeholderText}
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
+                    disabled={isPromptDisabled}
                 />
             </div>
 
              <div className="reference-image-section">
-                <div className="section-title font-semibold text-gray-300 mb-2">📸 Imagem de Referência (Opcional)</div>
+                <div className="section-title font-semibold text-gray-300 mb-2">📸 Imagem de Referência</div>
                 <UploadArea
                     id="primary"
                     title="Clique ou arraste uma imagem"
@@ -149,7 +160,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                 <>
                     <div id="createFunctions" className="functions-section">
                          <div className="section-title font-semibold text-gray-300 mb-2">✨ Funções de Criação</div>
-                        <div className="functions-grid grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <div className="functions-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
                             {createFunctions.map(fn => (
                                 <FunctionCard
                                     key={fn.key}
@@ -161,7 +172,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                             ))}
                         </div>
                     </div>
-                    {createFunction !== CreateFunction.Miniature && createFunction !== CreateFunction.Skeleton && !image1 && (
+                    {createFunction !== CreateFunction.Miniature && createFunction !== CreateFunction.Skeleton && !image1 && createFunction !== CreateFunction.Colmap && createFunction !== CreateFunction.Animate && (
                         <div className="aspect-ratio-section">
                             <div className="section-title font-semibold text-gray-300 mb-2">📐 Proporção da Imagem</div>
                             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">

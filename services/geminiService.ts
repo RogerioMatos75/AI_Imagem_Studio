@@ -36,6 +36,43 @@ const getAugmentedPrompt = (prompt: string, func: CreateFunction, view: OrthoVie
 }
 
 export const generateImageApi = async (prompt: string, createFunction: CreateFunction, view: OrthoView | undefined, aspectRatio: AspectRatio, image: ImageFile | null): Promise<string> => {
+    if (createFunction === CreateFunction.Colmap) {
+        if (!image) {
+            throw new Error("Para a função Colmap, é necessário enviar uma imagem de referência.");
+        }
+
+        const colmapPrompt = `Generate a cinematic, photorealistic 4K keyframe image. A realistic statuette of the character from the reference image stands still in the center.
+
+**Base and Environment:** The character is on a simple, circular, matte gray concrete base. The base MUST feature high-contrast, non-repeating geometric markers (like checker patterns or fiducial markers) clearly visible on its surface to serve as tracking points for photogrammetry. The environment is a detailed skyscraper rooftop with industrial textures: concrete slabs and metal railings under a late afternoon sky.
+
+**Lighting and Camera:** Use soft, directional sunlight to cast long shadows and subtle highlights on the character. Simulate a cinematic full-frame camera with a 35mm lens, creating a shallow depth of field.
+
+**Composition:** The image must be full-frame and edge-to-edge clear. No vignettes, circular masks, or blurry edges. Maintain sharp focus on the character. The style is photorealistic, ensuring consistent lighting and texture detail, making it a perfect reference for NeRF training.`;
+
+        const parts: any[] = [
+            { inlineData: { data: image.base64, mimeType: image.mimeType } },
+            { text: colmapPrompt }
+        ];
+        
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image-preview',
+            contents: { parts },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+
+        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content && response.candidates[0].content.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+                }
+            }
+        }
+        throw new Error('A API não retornou uma imagem para a função Colmap. Tente novamente.');
+    }
+    
     if (createFunction === CreateFunction.Miniature) {
         if (!image) {
             throw new Error("Para a função Miniatura, é necessário enviar uma imagem.");
@@ -129,6 +166,50 @@ export const generateImageApi = async (prompt: string, createFunction: CreateFun
 
         throw new Error("Image generation failed or returned no images.");
     }
+};
+
+export const generateVideoApi = async (prompt: string, image: ImageFile): Promise<string> => {
+    const videoBasePrompt = `Create a 7-second, 4K, perfectly looping orbital video. A realistic statuette of the character from the reference image stands still in the center.
+
+**Base and Environment:** The character is on a simple, circular, matte gray concrete base. The base MUST feature high-contrast, non-repeating geometric markers (like checker patterns or fiducial markers) clearly visible on its surface to serve as tracking points for photogrammetry. The environment is a detailed skyscraper rooftop with industrial textures and a consistent 360-degree panoramic cityscape under late afternoon lighting.
+
+**Camera and Motion:** The camera orbits a full 360 degrees around the character with ±5cm vertical and horizontal drift to create strong parallax. Simulate a cinematic full-frame camera with a 35mm lens, shallow depth of field, and high shutter speed.
+
+**Video Quality:** The video must be full-frame and edge-to-edge clear. No vignettes, circular masks, black bars, or blurry edges. Maintain sharp focus on the character with minimal motion blur. Photorealistic. No audio. Ensure consistent lighting and texture detail across all frames for optimal NeRF training.`;
+
+    const finalPrompt = prompt ? `${videoBasePrompt}\n\nDetalhes adicionais do usuário: ${prompt}` : videoBasePrompt;
+
+    let operation = await ai.models.generateVideos({
+        model: 'veo-2.0-generate-001',
+        prompt: finalPrompt,
+        image: {
+            imageBytes: image.base64,
+            mimeType: image.mimeType,
+        },
+        config: {
+            numberOfVideos: 1
+        }
+    });
+
+    while (!operation.done) {
+        await new Promise(resolve => setTimeout(resolve, 10000)); // Poll every 10 seconds
+        operation = await ai.operations.getVideosOperation({ operation: operation });
+    }
+
+    const downloadLink = operation.response?.generatedVideos?.[0]?.video?.uri;
+
+    if (!downloadLink) {
+        throw new Error('A operação de vídeo foi concluída, mas nenhum link de download foi encontrado.');
+    }
+    
+    const videoResponse = await fetch(`${downloadLink}&key=${process.env.API_KEY}`);
+    
+    if (!videoResponse.ok) {
+        throw new Error(`Falha ao baixar o vídeo gerado. Status: ${videoResponse.statusText}`);
+    }
+
+    const videoBlob = await videoResponse.blob();
+    return URL.createObjectURL(videoBlob);
 };
 
 const skeletonFromImageBasePrompt = `Using the provided image as a reference, transform the character into a professional character design sheet for a 3D model. Masterpiece quality, 8k resolution, ultra-detailed, and intricately designed. The character must be depicted in full body, vibrant color with cinematic lighting, emphasizing detailed textures and materials. The style should be a high-quality digital painting, suitable for concept art trending on ArtStation. The character must be in a perfect T-pose (arms straight out to the sides, parallel to the ground) with hands open and palms flat, fingers straight and held close together (but not touching), with palms facing completely downwards. The legs should be in a neutral A-pose (feet slightly apart). The view is an orthographic projection isolated on a pure white background with no shadows, ideal for 3D modeling reference.`;

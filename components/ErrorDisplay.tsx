@@ -1,4 +1,3 @@
-
 import React from 'react';
 
 interface ErrorDisplayProps {
@@ -48,12 +47,31 @@ const getFriendlyError = (message: string): FriendlyError => {
             suggestion: 'A função "Miniatura" requer que você envie uma imagem do modelo para funcionar.'
         };
     }
+    if (message.includes('Para a função Colmap, é necessário enviar uma imagem de referência.')) {
+        return {
+            title: 'Imagem Faltando',
+            suggestion: 'A função "Colmap" requer que você envie uma imagem de referência para funcionar.'
+        };
+    }
+    if (message.includes('Para a função Animar Cena, é necessário enviar uma imagem.')) {
+        return {
+            title: 'Imagem Faltando',
+            suggestion: 'A função "Animar Cena" requer que você envie uma imagem de referência para funcionar.'
+        };
+    }
      if (message.includes('A API não retornou uma imagem')) {
         return {
             title: 'Falha na Geração',
             suggestion: 'A IA não conseguiu gerar uma imagem com a sua solicitação. Tente reformular seu prompt ou tente novamente mais tarde.'
         };
     }
+    if (message.includes('operação de vídeo foi concluída, mas nenhum link')) {
+         return {
+            title: 'Falha na Geração do Vídeo',
+            suggestion: 'Ocorreu um erro ao processar o vídeo final. Por favor, tente novamente.'
+        };
+    }
+
 
     return {
         title: 'Ocorreu um Erro Inesperado',

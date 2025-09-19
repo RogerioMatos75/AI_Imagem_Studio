@@ -10,6 +10,8 @@ export enum CreateFunction {
   Comic = 'comic',
   Skeleton = 'skeleton',
   Miniature = 'miniature',
+  Colmap = 'colmap',
+  Animate = 'animate',
 }
 
 export enum EditFunction {

@@ -1,9 +1,8 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { LeftPanel } from './components/LeftPanel';
 import { RightPanel } from './components/RightPanel';
 import { MobileModal } from './components/MobileModal';
-import { generateImageApi, editImageApi, transformImageToSkeletonApi } from './services/geminiService';
+import { generateImageApi, editImageApi, transformImageToSkeletonApi, generateVideoApi } from './services/geminiService';
 import { Mode, CreateFunction, EditFunction, ImageFile, OrthoView, AspectRatio } from './types';
 
 const STORAGE_KEY = 'ai-image-studio-settings';
@@ -51,7 +50,9 @@ const App: React.FC = () => {
     const [aspectRatio, setAspectRatio] = useState<AspectRatio>(initialState.aspectRatio);
     
     const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [loadingMessage, setLoadingMessage] = useState<string>('Gerando sua imagem...');
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+    const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -83,6 +84,7 @@ const App: React.FC = () => {
             setImage1(null);
             setImage2(null);
             setGeneratedImage(null);
+            setGeneratedVideo(null);
             setError(null);
             setIsLoading(false);
             setLastCreateFunction(null);
@@ -99,24 +101,47 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
+        setGeneratedVideo(null);
         setSkeletonSourceImage(null);
+
+        let loadingInterval: number | undefined = undefined;
 
         try {
             if (mode === Mode.Create) {
-                if (!prompt && !image1) {
-                    throw new Error('Por favor, insira um prompt ou uma imagem de referência para criar.');
-                }
-                
-                const resultImage = await generateImageApi(prompt, createFunction, undefined, aspectRatio, image1);
-                if (resultImage) {
+                 if (createFunction === CreateFunction.Animate) {
+                    if (!image1) {
+                        throw new Error('Para a função Animar Cena, é necessário enviar uma imagem.');
+                    }
+                    const messages = [
+                        'Aguarde, a IA está dirigindo a cena...',
+                        'Renderizando os frames em 4K...',
+                        'A criação de vídeos pode levar alguns minutos.',
+                        'Compilando a obra-prima...',
+                        'O resultado valerá a pena!',
+                    ];
+                    let msgIndex = 0;
+                    setLoadingMessage(messages[0]);
+                    loadingInterval = window.setInterval(() => {
+                        msgIndex = (msgIndex + 1) % messages.length;
+                        setLoadingMessage(messages[msgIndex]);
+                    }, 7000);
+
+                    const resultVideo = await generateVideoApi(prompt, image1);
+                    setGeneratedVideo(resultVideo);
+                    setLastCreateFunction(createFunction);
+                    setLastSuccessfulPrompt(prompt);
+                } else {
+                    if (!prompt && !image1) {
+                        throw new Error('Por favor, insira um prompt ou uma imagem de referência para criar.');
+                    }
+                    setLoadingMessage('Gerando sua imagem...');
+                    const resultImage = await generateImageApi(prompt, createFunction, undefined, aspectRatio, image1);
                     setGeneratedImage(resultImage);
                     setLastCreateFunction(createFunction);
-                    setLastSuccessfulPrompt(prompt); // Always save prompt on success
-                    if (window.innerWidth < 768) {
-                        setIsModalOpen(true);
-                    }
-                } else {
-                    throw new Error('A API não retornou uma imagem. Tente novamente.');
+                    setLastSuccessfulPrompt(prompt); 
+                }
+                if (window.innerWidth < 768) {
+                    setIsModalOpen(true);
                 }
             } else { // Mode.Edit
                 if (!prompt) {
@@ -129,33 +154,32 @@ const App: React.FC = () => {
                 if(!isCompose && !image1) {
                     throw new Error('Por favor, envie uma imagem para editar.');
                 }
-                
+                setLoadingMessage('Aplicando edições...');
                 const resultImage = await editImageApi(prompt, editFunction, image1, isCompose ? image2 : null);
-                if (resultImage) {
-                    setGeneratedImage(resultImage);
-                    setLastCreateFunction(null);
-                    if (window.innerWidth < 768) {
-                        setIsModalOpen(true);
-                    }
-                } else {
-                     throw new Error('A API não retornou uma imagem. Tente novamente.');
+                setGeneratedImage(resultImage);
+                setLastCreateFunction(null);
+                if (window.innerWidth < 768) {
+                    setIsModalOpen(true);
                 }
             }
         } catch (err) {
             console.error(err);
             setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
         } finally {
+            if (loadingInterval) clearInterval(loadingInterval);
             setIsLoading(false);
         }
     }, [isLoading, mode, prompt, createFunction, editFunction, image1, image2, aspectRatio]);
     
     const handleRegenerate = useCallback(async () => {
         // Only allow regenerate for create functions, not for skeletons which have their own flow
-        if (isLoading || !lastSuccessfulPrompt || !lastCreateFunction || lastCreateFunction === CreateFunction.Skeleton) return;
+        if (isLoading || !lastSuccessfulPrompt || !lastCreateFunction || lastCreateFunction === CreateFunction.Skeleton || lastCreateFunction === CreateFunction.Animate) return;
         
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
+        setGeneratedVideo(null);
+        setLoadingMessage('Recriando sua imagem...');
 
         try {
             // Check if the last generation used a reference image.
@@ -191,6 +215,9 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
+        setGeneratedVideo(null);
+        setLoadingMessage(`Gerando vista ${view}...`);
+
 
         try {
             let resultImage: string | null = null;
@@ -223,7 +250,9 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
+        setGeneratedVideo(null);
         setLastSuccessfulPrompt('');
+        setLoadingMessage('Transformando em modelo T-Pose...');
     
         try {
             const mimeTypeMatch = generatedImage.match(/data:(.*);base64,/);
@@ -271,6 +300,7 @@ const App: React.FC = () => {
         setImage1(newImageFile);
         setImage2(null);
         setGeneratedImage(null);
+        setGeneratedVideo(null);
         setError(null);
         setSkeletonSourceImage(null);
         setAspectRatio('1:1');
@@ -304,7 +334,9 @@ const App: React.FC = () => {
                 />
                 <RightPanel
                     isLoading={isLoading}
+                    loadingMessage={loadingMessage}
                     generatedImage={generatedImage}
+                    generatedVideo={generatedVideo}
                     createFunction={createFunction}
                     error={error}
                     onEditCurrentImage={handleEditCurrentImage}
@@ -319,6 +351,7 @@ const App: React.FC = () => {
             <MobileModal 
                 isOpen={isModalOpen}
                 generatedImage={generatedImage}
+                generatedVideo={generatedVideo}
                 onEdit={handleEditCurrentImage}
                 onNew={() => {
                     resetToDefaults();
