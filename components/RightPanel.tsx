@@ -14,6 +14,7 @@ interface RightPanelProps {
     onGenerateOrthoView: (view: OrthoView) => void;
     onGenerateSkeletonFromPrompt: () => void;
     onDismissError: () => void;
+    onRegenerate: () => void;
 }
 
 const downloadImage = (imageUrl: string) => {
@@ -25,7 +26,7 @@ const downloadImage = (imageUrl: string) => {
     document.body.removeChild(link);
 };
 
-export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, generatedImage, createFunction, error, onEditCurrentImage, lastCreateFunction, lastPrompt, onGenerateOrthoView, onGenerateSkeletonFromPrompt, onDismissError }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, generatedImage, createFunction, error, onEditCurrentImage, lastCreateFunction, lastPrompt, onGenerateOrthoView, onGenerateSkeletonFromPrompt, onDismissError, onRegenerate }) => {
     const renderContent = () => {
         if (isLoading) {
             const loadingText = 'Gerando sua imagem...';
@@ -51,6 +52,7 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, generatedImag
             ].includes(lastCreateFunction) && lastPrompt;
 
             const isSkeletonResult = lastCreateFunction === CreateFunction.Skeleton;
+            const canRegenerate = lastCreateFunction && lastCreateFunction !== CreateFunction.Skeleton;
 
             return (
                 <div id="imageContainer" className="image-container relative w-full h-full flex flex-col items-center justify-center">
@@ -58,6 +60,9 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, generatedImag
                     
                     <div className="actions-bar absolute bottom-4 w-full flex justify-center items-center gap-2 px-4">
                         <button onClick={onEditCurrentImage} className="action-btn bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">✏️ Editar</button>
+                        {canRegenerate && (
+                             <button onClick={onRegenerate} className="action-btn bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">🔄 Regenerar</button>
+                        )}
                         <button onClick={() => downloadImage(generatedImage)} className="action-btn bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">💾 Salvar</button>
                         {canGenerateSkeleton && (
                             <button onClick={onGenerateSkeletonFromPrompt} className="action-btn bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">💀 Gerar Esqueleto 3D</button>
@@ -86,10 +91,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, generatedImag
         );
     };
 
-    // FIX: A React functional component must return a ReactNode. 
-    // The main component body was missing its return statement, causing it to implicitly return 'void'.
     return (
-        <div className="right-panel w-full md:w-2/3 bg-gray-900 flex items-center justify-center p-6 relative">
+        <div className="right-panel w-full md:w-2/3 bg-gray-900 flex flex-grow items-center justify-center p-6 relative">
             {renderContent()}
         </div>
     );

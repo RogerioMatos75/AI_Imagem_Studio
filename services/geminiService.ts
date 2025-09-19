@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Modality } from "@google/genai";
 import { CreateFunction, EditFunction, ImageFile, OrthoView, AspectRatio } from '../types';
 
@@ -85,24 +84,51 @@ export const generateImageApi = async (prompt: string, createFunction: CreateFun
         throw new Error('A API não retornou uma imagem para a função Miniatura. Tente novamente.');
     }
     
-    // Default image generation logic
     const augmentedPrompt = getAugmentedPrompt(prompt, createFunction, view);
-    const response = await ai.models.generateImages({
-        model: 'imagen-4.0-generate-001',
-        prompt: augmentedPrompt,
-        config: {
-            numberOfImages: 1,
-            outputMimeType: 'image/png',
-            aspectRatio: aspectRatio,
-        },
-    });
+    
+    // Logic for multimodal (image + text) or text-only generation
+    if (image) {
+        const parts: any[] = [
+            { inlineData: { data: image.base64, mimeType: image.mimeType } },
+            { text: augmentedPrompt }
+        ];
 
-    if (response.generatedImages && response.generatedImages.length > 0) {
-        const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
-        return `data:image/png;base64,${base64ImageBytes}`;
+        const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image-preview',
+            contents: { parts },
+            config: {
+                responseModalities: [Modality.IMAGE, Modality.TEXT],
+            },
+        });
+
+        if (response.candidates && response.candidates.length > 0 && response.candidates[0].content && response.candidates[0].content.parts) {
+            for (const part of response.candidates[0].content.parts) {
+                if (part.inlineData) {
+                    const base64ImageBytes: string = part.inlineData.data;
+                    return `data:${part.inlineData.mimeType};base64,${base64ImageBytes}`;
+                }
+            }
+        }
+        throw new Error('A API não retornou uma imagem ao usar a imagem de referência. Tente novamente.');
+    } else {
+        // Default text-to-image generation logic
+        const response = await ai.models.generateImages({
+            model: 'imagen-4.0-generate-001',
+            prompt: augmentedPrompt,
+            config: {
+                numberOfImages: 1,
+                outputMimeType: 'image/png',
+                aspectRatio: aspectRatio,
+            },
+        });
+
+        if (response.generatedImages && response.generatedImages.length > 0) {
+            const base64ImageBytes: string = response.generatedImages[0].image.imageBytes;
+            return `data:image/png;base64,${base64ImageBytes}`;
+        }
+
+        throw new Error("Image generation failed or returned no images.");
     }
-
-    throw new Error("Image generation failed or returned no images.");
 };
 
 const skeletonFromImageBasePrompt = `Using the provided image as a reference, transform the character into a professional character design sheet for a 3D model. Masterpiece quality, 8k resolution, ultra-detailed, and intricately designed. The character must be depicted in full body, vibrant color with cinematic lighting, emphasizing detailed textures and materials. The style should be a high-quality digital painting, suitable for concept art trending on ArtStation. The character must be in a perfect T-pose (arms straight out to the sides, parallel to the ground) with hands open and palms flat, fingers straight and held close together (but not touching), with palms facing completely downwards. The legs should be in a neutral A-pose (feet slightly apart). The view is an orthographic projection isolated on a pure white background with no shadows, ideal for 3D modeling reference.`;

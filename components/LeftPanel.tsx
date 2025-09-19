@@ -21,6 +21,7 @@ interface LeftPanelProps {
     onGenerate: () => void;
     aspectRatio: AspectRatio;
     setAspectRatio: (ratio: AspectRatio) => void;
+    onReset: () => void;
 }
 
 const createFunctions = [
@@ -51,25 +52,10 @@ const aspectRatios: { key: AspectRatio; name: string }[] = [
 export const LeftPanel: React.FC<LeftPanelProps> = ({
     prompt, setPrompt, mode, setMode, createFunction, setCreateFunction,
     editFunction, setEditFunction, image1, setImage1, image2, setImage2,
-    isLoading, onGenerate, aspectRatio, setAspectRatio
+    isLoading, onGenerate, aspectRatio, setAspectRatio, onReset
 }) => {
+    const isComposeSelected = mode === Mode.Edit && editFunction === EditFunction.Compose;
 
-    const showTwoImages = mode === Mode.Edit && editFunction === EditFunction.Compose;
-    const showOneImage = mode === Mode.Edit && editFunction !== EditFunction.Compose;
-    
-    const [showEditFunctions, setShowEditFunctions] = React.useState(true);
-
-    const handleEditFunctionClick = (func: EditFunction) => {
-        setEditFunction(func);
-        if (func === EditFunction.Compose) {
-            setShowEditFunctions(false);
-        }
-    }
-
-    const backToEditFunctions = () => {
-        setShowEditFunctions(true);
-    }
-    
     const handleImageUpload = (file: File | null, setter: (img: ImageFile | null) => void) => {
         if (!file) {
             setter(null);
@@ -101,10 +87,22 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
         : "Descreva a imagem ou modelo que você deseja criar...";
 
     return (
-        <div className="left-panel w-full md:w-1/3 bg-gray-800 p-6 flex flex-col space-y-4 overflow-y-auto h-screen">
-            <header>
-                <h1 className="panel-title text-3xl font-bold text-white">🎨 AI Image Studio</h1>
-                <p className="panel-subtitle text-gray-400">Gerador profissional de imagens e modelos 3D</p>
+        <div className="left-panel w-full md:w-1/3 bg-gray-800 p-6 flex flex-col space-y-4 md:overflow-y-auto md:h-screen">
+            <header className="flex justify-between items-start">
+                <div>
+                    <h1 className="panel-title text-3xl font-bold text-white">🎨 AI Image Studio</h1>
+                    <p className="panel-subtitle text-gray-400">Gerador profissional de imagens e modelos 3D</p>
+                </div>
+                <button
+                    onClick={onReset}
+                    title="Reiniciar Aplicativo"
+                    className="p-2 rounded-full text-gray-400 hover:bg-gray-700 hover:text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-800 focus:ring-blue-500 transition-colors"
+                    aria-label="Reiniciar aplicativo"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0011.667 0l3.182-3.182m0-4.991v4.99" />
+                    </svg>
+                </button>
             </header>
             
             <div className="prompt-section">
@@ -115,6 +113,18 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                     placeholder={placeholderText}
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
+                />
+            </div>
+
+             <div className="reference-image-section">
+                <div className="section-title font-semibold text-gray-300 mb-2">📸 Imagem de Referência (Opcional)</div>
+                <UploadArea
+                    id="primary"
+                    title="Clique ou arraste uma imagem"
+                    subtext="PNG, JPG, WebP (máx. 10MB)"
+                    imageFile={image1}
+                    onImageSelect={(file) => handleImageUpload(file, setImage1)}
+                    isDual={false}
                 />
             </div>
             
@@ -151,20 +161,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                             ))}
                         </div>
                     </div>
-                    {createFunction === CreateFunction.Miniature && (
-                        <div className="dynamic-content flex-grow flex flex-col space-y-2">
-                             <div className="section-title font-semibold text-gray-300">📸 Imagem do Modelo</div>
-                            <UploadArea
-                                id="miniature"
-                                title="Clique ou arraste uma imagem"
-                                subtext="PNG, JPG, WebP (máx. 10MB)"
-                                imageFile={image1}
-                                onImageSelect={(file) => handleImageUpload(file, setImage1)}
-                                isDual={false}
-                            />
-                        </div>
-                    )}
-                    {createFunction !== CreateFunction.Miniature && (
+                    {createFunction !== CreateFunction.Miniature && createFunction !== CreateFunction.Skeleton && !image1 && (
                         <div className="aspect-ratio-section">
                             <div className="section-title font-semibold text-gray-300 mb-2">📐 Proporção da Imagem</div>
                             <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
@@ -183,7 +180,7 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                 </>
             )}
             
-            {mode === Mode.Edit && showEditFunctions && !showTwoImages && (
+            {mode === Mode.Edit && (
                  <div id="editFunctions" className="functions-section">
                     <div className="section-title font-semibold text-gray-300 mb-2">🛠️ Funções de Edição</div>
                      <div className="functions-grid grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -193,47 +190,26 @@ export const LeftPanel: React.FC<LeftPanelProps> = ({
                                 icon={fn.icon}
                                 name={fn.name}
                                 isActive={editFunction === fn.key}
-                                onClick={() => handleEditFunctionClick(fn.key)}
+                                onClick={() => setEditFunction(fn.key)}
                             />
                         ))}
                      </div>
                  </div>
             )}
 
-            <div className="dynamic-content flex-grow flex flex-col">
-                 {showTwoImages && (
-                    <div id="twoImagesSection" className="functions-section flex flex-col space-y-3">
-                         <div className="section-title font-semibold text-gray-300 mb-1">📸 Duas Imagens Necessárias</div>
-                         <UploadArea
-                            id="1"
-                            title="Primeira Imagem"
-                            imageFile={image1}
-                            onImageSelect={(file) => handleImageUpload(file, setImage1)}
-                            isDual={true}
-                         />
-                         <UploadArea
-                            id="2"
-                            title="Segunda Imagem"
-                            imageFile={image2}
-                            onImageSelect={(file) => handleImageUpload(file, setImage2)}
-                            isDual={true}
-                         />
-                         <button className="back-btn w-full text-left text-sm text-blue-400 hover:underline" onClick={backToEditFunctions}>
-                             ← Voltar para Edição
-                         </button>
-                    </div>
-                )}
-                {showOneImage && (
-                    <UploadArea
-                        id="single"
-                        title="Clique ou arraste uma imagem"
-                        subtext="PNG, JPG, WebP (máx. 10MB)"
-                        imageFile={image1}
-                        onImageSelect={(file) => handleImageUpload(file, setImage1)}
-                        isDual={false}
-                    />
-                )}
-            </div>
+            {isComposeSelected && (
+                <div id="composeSection" className="functions-section flex flex-col space-y-2">
+                     <div className="section-title font-semibold text-gray-300">🖼️ Imagem Secundária (para Unir)</div>
+                     <UploadArea
+                        id="2"
+                        title="Segunda Imagem"
+                        subtext="Arraste ou clique aqui"
+                        imageFile={image2}
+                        onImageSelect={(file) => handleImageUpload(file, setImage2)}
+                        isDual={true}
+                     />
+                </div>
+            )}
             
             <div className="mt-auto pt-4">
                  <button 

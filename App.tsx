@@ -75,19 +75,22 @@ const App: React.FC = () => {
 
 
     const resetToDefaults = () => {
-        setPrompt('');
-        setMode(Mode.Create);
-        setCreateFunction(CreateFunction.Free);
-        setEditFunction(EditFunction.AddRemove);
-        setImage1(null);
-        setImage2(null);
-        setGeneratedImage(null);
-        setError(null);
-        setIsLoading(false);
-        setLastCreateFunction(null);
-        setLastSuccessfulPrompt('');
-        setSkeletonSourceImage(null);
-        setAspectRatio('1:1');
+        if (window.confirm("Você tem certeza que deseja reiniciar o aplicativo? Todas as configurações e imagens atuais serão perdidas.")) {
+            setPrompt('');
+            setMode(Mode.Create);
+            setCreateFunction(CreateFunction.Free);
+            setEditFunction(EditFunction.AddRemove);
+            setImage1(null);
+            setImage2(null);
+            setGeneratedImage(null);
+            setError(null);
+            setIsLoading(false);
+            setLastCreateFunction(null);
+            setLastSuccessfulPrompt('');
+            setSkeletonSourceImage(null);
+            setAspectRatio('1:1');
+            localStorage.removeItem(STORAGE_KEY);
+        }
     };
 
     const handleGenerate = useCallback(async () => {
@@ -100,14 +103,11 @@ const App: React.FC = () => {
 
         try {
             if (mode === Mode.Create) {
-                if (!prompt) {
-                    throw new Error('Por favor, insira um prompt para criar.');
+                if (!prompt && !image1) {
+                    throw new Error('Por favor, insira um prompt ou uma imagem de referência para criar.');
                 }
-                if (createFunction === CreateFunction.Miniature && !image1) {
-                    throw new Error('Para a função Miniatura, é necessário enviar uma imagem.');
-                }
-
-                const resultImage = await generateImageApi(prompt, createFunction, undefined, aspectRatio, createFunction === CreateFunction.Miniature ? image1 : null);
+                
+                const resultImage = await generateImageApi(prompt, createFunction, undefined, aspectRatio, image1);
                 if (resultImage) {
                     setGeneratedImage(resultImage);
                     setLastCreateFunction(createFunction);
@@ -149,6 +149,37 @@ const App: React.FC = () => {
         }
     }, [isLoading, mode, prompt, createFunction, editFunction, image1, image2, aspectRatio]);
     
+    const handleRegenerate = useCallback(async () => {
+        // Only allow regenerate for create functions, not for skeletons which have their own flow
+        if (isLoading || !lastSuccessfulPrompt || !lastCreateFunction || lastCreateFunction === CreateFunction.Skeleton) return;
+        
+        setError(null);
+        setIsLoading(true);
+        setGeneratedImage(null);
+
+        try {
+            // Check if the last generation used a reference image.
+            // The `image1` state should still hold the source image if no other action was taken.
+            const sourceImageForRegen = (lastCreateFunction === CreateFunction.Miniature || image1) ? image1 : null;
+
+            const resultImage = await generateImageApi(lastSuccessfulPrompt, lastCreateFunction, undefined, aspectRatio, sourceImageForRegen);
+            
+            if (resultImage) {
+                setGeneratedImage(resultImage);
+                if (window.innerWidth < 768) {
+                    setIsModalOpen(true);
+                }
+            } else {
+                throw new Error('A API não retornou uma imagem. Tente novamente.');
+            }
+        } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [isLoading, lastSuccessfulPrompt, lastCreateFunction, aspectRatio, image1]);
+
     const handleGenerateOrthoView = useCallback(async (view: OrthoView) => {
         if (isLoading) return;
 
@@ -227,21 +258,31 @@ const App: React.FC = () => {
 
     const handleEditCurrentImage = () => {
         if (!generatedImage) return;
-        resetToDefaults();
-        setMode(Mode.Edit);
+        
         const newImageFile: ImageFile = {
             base64: generatedImage.split(',')[1],
             mimeType: 'image/png'
         };
+        
+        setMode(Mode.Edit);
+        setEditFunction(EditFunction.AddRemove);
+        setCreateFunction(CreateFunction.Free)
+        setPrompt('');
         setImage1(newImageFile);
+        setImage2(null);
+        setGeneratedImage(null);
+        setError(null);
+        setSkeletonSourceImage(null);
+        setAspectRatio('1:1');
+
         if (window.innerWidth < 768) {
             setIsModalOpen(false);
         }
     };
 
     return (
-        <div className="container mx-auto p-0 md:p-4 min-h-screen flex flex-col md:flex-row bg-gray-900">
-            <div className="flex w-full min-h-screen">
+        <div className="w-full min-h-screen bg-gray-900 flex flex-col">
+            <div className="flex flex-col md:flex-row w-full flex-grow">
                 <LeftPanel
                     prompt={prompt}
                     setPrompt={setPrompt}
@@ -259,6 +300,7 @@ const App: React.FC = () => {
                     onGenerate={handleGenerate}
                     aspectRatio={aspectRatio}
                     setAspectRatio={setAspectRatio}
+                    onReset={resetToDefaults}
                 />
                 <RightPanel
                     isLoading={isLoading}
@@ -271,6 +313,7 @@ const App: React.FC = () => {
                     onGenerateOrthoView={handleGenerateOrthoView}
                     onGenerateSkeletonFromPrompt={handleGenerateSkeletonFromPrompt}
                     onDismissError={() => setError(null)}
+                    onRegenerate={handleRegenerate}
                 />
             </div>
             <MobileModal 
