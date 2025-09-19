@@ -169,13 +169,15 @@ export const generateImageApi = async (prompt: string, createFunction: CreateFun
 };
 
 export const generateVideoApi = async (prompt: string, image: ImageFile): Promise<string> => {
-    const videoBasePrompt = `Create a 7-second, 4K, perfectly looping orbital video. A realistic statuette of the character from the reference image stands still in the center.
+    const videoBasePrompt = `Create a 10-second, 4K, perfectly looping orbital video. A realistic statuette of the character from the reference image stands still in the center.
+
+**Video Start:** The video MUST start with a static, clear, 1-second shot of the character based on the reference image. There should be absolutely no fade-in, black frames, or distortion at the beginning. After the initial static second, the camera immediately begins its motion.
 
 **Base and Environment:** The character is on a simple, circular, matte gray concrete base. The base MUST feature high-contrast, non-repeating geometric markers (like checker patterns or fiducial markers) clearly visible on its surface to serve as tracking points for photogrammetry. The environment is a detailed skyscraper rooftop with industrial textures and a consistent 360-degree panoramic cityscape under late afternoon lighting.
 
-**Camera and Motion:** The camera orbits a full 360 degrees around the character with ±5cm vertical and horizontal drift to create strong parallax. Simulate a cinematic full-frame camera with a 35mm lens, shallow depth of field, and high shutter speed.
+**Camera and Motion:** Over the remaining 9 seconds, the camera must perform a single, smooth, complete 360-degree orbit around the character. It should also have a slight vertical and horizontal drift (±5cm) to create a strong parallax effect, essential for 3D reconstruction. Simulate a cinematic full-frame camera with a 35mm lens, shallow depth of field, and high shutter speed.
 
-**Video Quality:** The video must be full-frame and edge-to-edge clear. No vignettes, circular masks, black bars, or blurry edges. Maintain sharp focus on the character with minimal motion blur. Photorealistic. No audio. Ensure consistent lighting and texture detail across all frames for optimal NeRF training.`;
+**Video Quality:** The output video resolution MUST BE SQUARE (1:1 aspect ratio, for example 1080x1080 pixels). It is critical that the final video is not widescreen (16:9). The video must be full-frame and edge-to-edge clear. No vignettes, circular masks, black bars, or blurry edges. Maintain sharp focus on the character with minimal motion blur. Photorealistic. No audio. Ensure consistent lighting and texture detail across all frames for optimal NeRF training.`;
 
     const finalPrompt = prompt ? `${videoBasePrompt}\n\nDetalhes adicionais do usuário: ${prompt}` : videoBasePrompt;
 
