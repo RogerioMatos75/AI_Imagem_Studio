@@ -52,7 +52,7 @@ const App: React.FC = () => {
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [loadingMessage, setLoadingMessage] = useState<string>('Gerando sua imagem...');
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
+    const [generatedVideo, setGeneratedVideo] = useState<string[]>([]);
     const [error, setError] = useState<string | null>(null);
     
     const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -84,7 +84,7 @@ const App: React.FC = () => {
             setImage1(null);
             setImage2(null);
             setGeneratedImage(null);
-            setGeneratedVideo(null);
+            setGeneratedVideo([]);
             setError(null);
             setIsLoading(false);
             setLastCreateFunction(null);
@@ -101,10 +101,8 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
-        setGeneratedVideo(null);
+        setGeneratedVideo([]);
         setSkeletonSourceImage(null);
-
-        let loadingInterval: number | undefined = undefined;
 
         try {
             if (mode === Mode.Create) {
@@ -112,24 +110,12 @@ const App: React.FC = () => {
                     if (!image1) {
                         throw new Error('Para a função Animar Cena, é necessário enviar uma imagem.');
                     }
-                    const messages = [
-                        'Aguarde, a IA está dirigindo a cena...',
-                        'Renderizando os frames em 4K...',
-                        'A criação de vídeos pode levar alguns minutos.',
-                        'Compilando a obra-prima...',
-                        'O resultado valerá a pena!',
-                    ];
-                    let msgIndex = 0;
-                    setLoadingMessage(messages[0]);
-                    loadingInterval = window.setInterval(() => {
-                        msgIndex = (msgIndex + 1) % messages.length;
-                        setLoadingMessage(messages[msgIndex]);
-                    }, 7000);
-
-                    const resultVideo = await generateVideoApi(prompt, image1);
-                    setGeneratedVideo(resultVideo);
+                    setLoadingMessage(`Gerando mosaico de vídeo (1/3)...\nIsso pode levar alguns minutos.`);
+                    const resultVideo = await generateVideoApi(prompt, image1, 1);
+                    setGeneratedVideo([resultVideo]);
                     setLastCreateFunction(createFunction);
                     setLastSuccessfulPrompt(prompt);
+                    
                 } else {
                     if (!prompt && !image1) {
                         throw new Error('Por favor, insira um prompt ou uma imagem de referência para criar.');
@@ -166,10 +152,29 @@ const App: React.FC = () => {
             console.error(err);
             setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
         } finally {
-            if (loadingInterval) clearInterval(loadingInterval);
             setIsLoading(false);
         }
     }, [isLoading, mode, prompt, createFunction, editFunction, image1, image2, aspectRatio]);
+
+    const handleGenerateNextSegment = useCallback(async (lastFrame: ImageFile) => {
+        if (isLoading || generatedVideo.length === 0 || generatedVideo.length >= 3) return;
+
+        setError(null);
+        setIsLoading(true);
+
+        const nextSegment = (generatedVideo.length + 1) as 2 | 3;
+        setLoadingMessage(`Gerando mosaico de vídeo (${nextSegment}/3)...\nIsso pode levar alguns minutos.`);
+
+        try {
+            const resultVideo = await generateVideoApi(lastSuccessfulPrompt, lastFrame, nextSegment);
+            setGeneratedVideo(prev => [...prev, resultVideo]);
+        } catch (err) {
+            console.error(err);
+            setError(err instanceof Error ? err.message : 'Ocorreu um erro desconhecido.');
+        } finally {
+            setIsLoading(false);
+        }
+    }, [isLoading, generatedVideo, lastSuccessfulPrompt]);
     
     const handleRegenerate = useCallback(async () => {
         // Only allow regenerate for create functions, not for skeletons which have their own flow
@@ -178,7 +183,7 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
-        setGeneratedVideo(null);
+        setGeneratedVideo([]);
         setLoadingMessage('Recriando sua imagem...');
 
         try {
@@ -215,7 +220,7 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
-        setGeneratedVideo(null);
+        setGeneratedVideo([]);
         setLoadingMessage(`Gerando vista ${view}...`);
 
 
@@ -250,7 +255,7 @@ const App: React.FC = () => {
         setError(null);
         setIsLoading(true);
         setGeneratedImage(null);
-        setGeneratedVideo(null);
+        setGeneratedVideo([]);
         setLastSuccessfulPrompt('');
         setLoadingMessage('Transformando em modelo T-Pose...');
     
@@ -300,7 +305,7 @@ const App: React.FC = () => {
         setImage1(newImageFile);
         setImage2(null);
         setGeneratedImage(null);
-        setGeneratedVideo(null);
+        setGeneratedVideo([]);
         setError(null);
         setSkeletonSourceImage(null);
         setAspectRatio('1:1');
@@ -325,7 +330,7 @@ const App: React.FC = () => {
 
         setImage1(newImageFile);
         setGeneratedImage(null);
-        setGeneratedVideo(null);
+        setGeneratedVideo([]);
         setError(null);
         
         if (lastCreateFunction === CreateFunction.Colmap) {
@@ -376,6 +381,7 @@ const App: React.FC = () => {
                     onGenerateSkeletonFromPrompt={handleGenerateSkeletonFromPrompt}
                     onDismissError={() => setError(null)}
                     onRegenerate={handleRegenerate}
+                    onGenerateNextSegment={handleGenerateNextSegment}
                 />
             </div>
             <MobileModal 
@@ -389,6 +395,7 @@ const App: React.FC = () => {
                     setIsModalOpen(false);
                 }}
                 onClose={() => setIsModalOpen(false)}
+                onGenerateNextSegment={handleGenerateNextSegment}
             />
         </div>
     );

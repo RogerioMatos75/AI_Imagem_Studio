@@ -1,12 +1,12 @@
-import React from 'react';
-import { CreateFunction, OrthoView } from '../types';
+import React, { useRef } from 'react';
+import { CreateFunction, OrthoView, ImageFile } from '../types';
 import { ErrorDisplay } from './ErrorDisplay';
 
 interface RightPanelProps {
     isLoading: boolean;
     loadingMessage: string;
     generatedImage: string | null;
-    generatedVideo: string | null;
+    generatedVideo: string[];
     createFunction: CreateFunction;
     error: string | null;
     onEditCurrentImage: () => void;
@@ -17,24 +17,49 @@ interface RightPanelProps {
     onGenerateSkeletonFromPrompt: () => void;
     onDismissError: () => void;
     onRegenerate: () => void;
+    onGenerateNextSegment: (lastFrame: ImageFile) => void;
 }
 
-const downloadAsset = (assetUrl: string, isVideo: boolean) => {
+const downloadAsset = (assetUrl: string, isVideo: boolean, index?: number) => {
     const link = document.createElement('a');
     link.href = assetUrl;
-    link.download = `ai-asset-${Date.now()}.${isVideo ? 'mp4' : 'png'}`;
+    const name = `ai-asset-${Date.now()}`;
+    const extension = isVideo ? 'mp4' : 'png';
+    const segment = index !== undefined ? `-segment-${index + 1}` : '';
+    link.download = `${name}${segment}.${extension}`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
 };
 
-export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, loadingMessage, generatedImage, generatedVideo, createFunction, error, onEditCurrentImage, onUseAsReference, lastCreateFunction, lastPrompt, onGenerateOrthoView, onGenerateSkeletonFromPrompt, onDismissError, onRegenerate }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, loadingMessage, generatedImage, generatedVideo, createFunction, error, onEditCurrentImage, onUseAsReference, lastCreateFunction, lastPrompt, onGenerateOrthoView, onGenerateSkeletonFromPrompt, onDismissError, onRegenerate, onGenerateNextSegment }) => {
+    const latestVideoRef = useRef<HTMLVideoElement>(null);
+
+    const handleCaptureFrame = () => {
+        const video = latestVideoRef.current;
+        if (!video) return;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        
+        const dataUrl = canvas.toDataURL('image/png');
+        const base64 = dataUrl.split(',')[1];
+        const imageFile: ImageFile = { base64, mimeType: 'image/png' };
+        
+        onGenerateNextSegment(imageFile);
+    };
+
     const renderContent = () => {
         if (isLoading) {
             return (
                 <div id="loadingContainer" className="loading-container flex flex-col items-center justify-center text-center text-gray-400 p-4 h-full">
                     <div className="loading-spinner w-16 h-16 border-8 border-t-blue-500 border-gray-600 rounded-full animate-spin mb-4"></div>
-                    <div className="loading-text text-xl">{loadingMessage}</div>
+                    <div className="loading-text text-xl whitespace-pre-wrap">{loadingMessage}</div>
                 </div>
             );
         }
@@ -43,23 +68,40 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, loadingMessag
             return <ErrorDisplay message={error} onDismiss={onDismissError} />
         }
         
-        if (generatedVideo) {
-             return (
-                <div id="videoContainer" className="video-container relative w-full h-full flex flex-col items-center justify-center">
-                    <video 
-                        src={generatedVideo} 
-                        controls 
-                        autoPlay 
-                        loop 
-                        muted
-                        className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-lg"
-                    />
-                    <div className="actions-bar absolute bottom-4 w-full flex justify-center items-center gap-2 px-4">
-                        <button onClick={() => downloadAsset(generatedVideo, true)} className="action-btn bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">💾 Salvar Vídeo</button>
-                    </div>
-                </div>
-            );
-        }
+        if (generatedVideo && generatedVideo.length > 0) {
+            const isMosaicInProgress = generatedVideo.length < 3;
+            const isMosaicComplete = generatedVideo.length === 3;
+            const title = isMosaicComplete ? "Mosaico de Vídeos Gerado" : `Mosaico de Vídeos em Andamento (${generatedVideo.length}/3)`;
+
+            return (
+               <div id="videoContainer" className="w-full h-full flex flex-col items-center justify-center p-4">
+                   <h2 className="text-2xl font-bold text-white mb-4">{title}</h2>
+                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 w-full max-w-5xl">
+                       {generatedVideo.map((videoUrl, index) => (
+                           <div key={index} className="flex flex-col items-center gap-2 bg-gray-800 p-2 rounded-lg shadow-lg">
+                               <p className="text-white font-semibold">Segmento {index + 1}/3</p>
+                               <video
+                                    ref={index === generatedVideo.length - 1 ? latestVideoRef : null}
+                                    src={videoUrl}
+                                    controls
+                                    muted
+                                    loop={isMosaicComplete}
+                                    className="w-full rounded-md"
+                                />
+                               <button onClick={() => downloadAsset(videoUrl, true, index)} className="action-btn bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded-lg w-full transition-transform transform hover:scale-105">💾 Salvar Vídeo</button>
+                           </div>
+                       ))}
+                   </div>
+                   {isMosaicInProgress && !isLoading && (
+                       <div className="mt-6">
+                           <button onClick={handleCaptureFrame} className="action-btn bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-6 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105 text-lg">
+                               📸 Usar último frame como referência
+                           </button>
+                       </div>
+                   )}
+               </div>
+           );
+       }
 
         if (generatedImage) {
             const canGenerateSkeleton = lastCreateFunction && [

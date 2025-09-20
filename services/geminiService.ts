@@ -168,7 +168,23 @@ export const generateImageApi = async (prompt: string, createFunction: CreateFun
     }
 };
 
-export const generateVideoApi = async (prompt: string, image: ImageFile): Promise<string> => {
+const getVideoMotionPrompt = (segment: 1 | 2 | 3): string => {
+    const baseMotion = `It should also have a slight vertical and horizontal drift (±5cm) to create a strong parallax effect, essential for 3D reconstruction. Simulate a cinematic full-frame camera with a 35mm lens, shallow depth of field, and high shutter speed.`;
+    switch (segment) {
+        case 1:
+            return `**Camera and Motion (during seconds 1-5):** Over these 4 seconds, the camera must perform a single, smooth 120-degree orbit around the character. The orbit starts from a direct front view and moves smoothly towards the character's left side, ending at a 120-degree angle (a left-side-back view). ${baseMotion}`;
+        case 2:
+            return `**Camera and Motion (during seconds 1-5):** Over these 4 seconds, the camera must perform a single, smooth 120-degree orbit around the character. The orbit starts from a 120-degree angle (a left-side-back view) and moves smoothly behind the character, ending at a 240-degree angle (a right-side-back view). ${baseMotion}`;
+        case 3:
+            return `**Camera and Motion (during seconds 1-5):** Over these 4 seconds, the camera must perform a single, smooth 120-degree orbit around the character. The orbit starts from a 240-degree angle (a right-side-back view) and moves smoothly towards the character's right side, ending at a 360-degree angle (back to the direct front view to allow for a perfect loop with the start of the first video segment). ${baseMotion}`;
+        default: // Fallback to full 360, though it shouldn't be reached
+            return `**Camera and Motion (during seconds 1-5):** Over these 4 seconds, the camera must perform a single, smooth, complete 360-degree orbit around the character. ${baseMotion}`;
+    }
+};
+
+
+export const generateVideoApi = async (prompt: string, image: ImageFile, segment: 1 | 2 | 3): Promise<string> => {
+    const motionPrompt = getVideoMotionPrompt(segment);
     const videoBasePrompt = `CRITICAL INSTRUCTION 1: The output video MUST be a SQUARE (1:1 aspect ratio).
 CRITICAL INSTRUCTION 2: The video must start CLEANLY. The very first frame MUST be the intended scene. There should be absolutely no preceding frames, flashes, black frames, or distorted images.
 CRITICAL INSTRUCTION 3: You MUST faithfully reproduce all details from the reference image. The character, its base, and especially the geometric markers on the base MUST be identical to the provided image. Do not alter, omit, or regenerate these elements. The goal is to animate the provided image, not to create a new one.
@@ -182,7 +198,7 @@ Create a SQUARE video with a total duration of exactly 5 seconds, in 4K resoluti
 **Scene and Details (from reference image):**
 The character, base, environment, and all visual elements (including the crucial high-contrast geometric markers for photogrammetry on the base) MUST be preserved exactly as they appear in the reference image. The environment, a detailed skyscraper rooftop with industrial textures under late afternoon lighting, should be coherently extended into a 360-degree panoramic view for the camera orbit.
 
-**Camera and Motion (during seconds 1-5):** Over these 4 seconds, the camera must perform a single, smooth, complete 360-degree orbit around the character. It should also have a slight vertical and horizontal drift (±5cm) to create a strong parallax effect, essential for 3D reconstruction. Simulate a cinematic full-frame camera with a 35mm lens, shallow depth of field, and high shutter speed.
+${motionPrompt}
 
 **Video Quality and Aspect Ratio (CRITICAL):**
 The final output MUST be a SQUARE video with a 1:1 aspect ratio (e.g., 1080x1080 pixels). It is absolutely critical that the final video is NOT widescreen (16:9 or similar). The video must be full-frame and edge-to-edge clear. No vignettes, circular masks, black bars, or blurry edges. Maintain sharp focus on the character with minimal motion blur. Photorealistic. No audio. Ensure consistent lighting and texture detail across all frames for optimal NeRF training.`;
