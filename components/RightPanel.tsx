@@ -10,6 +10,7 @@ interface RightPanelProps {
     createFunction: CreateFunction;
     error: string | null;
     onEditCurrentImage: () => void;
+    onUseAsReference: () => void;
     lastCreateFunction: CreateFunction | null;
     lastPrompt: string;
     onGenerateOrthoView: (view: OrthoView) => void;
@@ -27,7 +28,7 @@ const downloadAsset = (assetUrl: string, isVideo: boolean) => {
     document.body.removeChild(link);
 };
 
-export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, loadingMessage, generatedImage, generatedVideo, createFunction, error, onEditCurrentImage, lastCreateFunction, lastPrompt, onGenerateOrthoView, onGenerateSkeletonFromPrompt, onDismissError, onRegenerate }) => {
+export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, loadingMessage, generatedImage, generatedVideo, createFunction, error, onEditCurrentImage, onUseAsReference, lastCreateFunction, lastPrompt, onGenerateOrthoView, onGenerateSkeletonFromPrompt, onDismissError, onRegenerate }) => {
     const renderContent = () => {
         if (isLoading) {
             return (
@@ -77,7 +78,8 @@ export const RightPanel: React.FC<RightPanelProps> = ({ isLoading, loadingMessag
                 <div id="imageContainer" className="image-container relative w-full h-full flex flex-col items-center justify-center">
                     <img src={generatedImage} alt="Generated Art" className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-lg" />
                     
-                    <div className="actions-bar absolute bottom-4 w-full flex justify-center items-center gap-2 px-4">
+                    <div className="actions-bar absolute bottom-4 w-full flex justify-center items-center flex-wrap gap-2 px-4">
+                        <button onClick={onUseAsReference} className="action-btn bg-teal-600 hover:bg-teal-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">🔄 Usar como Referência</button>
                         <button onClick={onEditCurrentImage} className="action-btn bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">✏️ Editar</button>
                         {canRegenerate && (
                              <button onClick={onRegenerate} className="action-btn bg-gray-600 hover:bg-gray-700 text-white font-semibold py-2 px-4 rounded-lg flex items-center gap-2 transition-transform transform hover:scale-105">🔄 Regenerar</button>

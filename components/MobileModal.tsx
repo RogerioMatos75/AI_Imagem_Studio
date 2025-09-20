@@ -5,6 +5,7 @@ interface MobileModalProps {
     generatedImage: string | null;
     generatedVideo: string | null;
     onEdit: () => void;
+    onUseAsReference: () => void;
     onNew: () => void;
     onClose: () => void;
 }
@@ -20,7 +21,7 @@ const downloadAsset = (assetUrl: string | null, isVideo: boolean) => {
 };
 
 
-export const MobileModal: React.FC<MobileModalProps> = ({ isOpen, generatedImage, generatedVideo, onEdit, onNew, onClose }) => {
+export const MobileModal: React.FC<MobileModalProps> = ({ isOpen, generatedImage, generatedVideo, onEdit, onUseAsReference, onNew, onClose }) => {
     if (!isOpen) return null;
 
     const isVideo = !!generatedVideo;
@@ -32,7 +33,12 @@ export const MobileModal: React.FC<MobileModalProps> = ({ isOpen, generatedImage
                      {generatedImage && !isVideo && <img id="modalImage" src={generatedImage} alt="Generated Art" className="modal-image w-full h-auto object-contain rounded-md" />}
                      {generatedVideo && isVideo && <video id="modalVideo" src={generatedVideo} controls autoPlay loop muted className="modal-video w-full h-auto object-contain rounded-md" />}
                 </div>
-                <div className="modal-actions grid grid-cols-3 gap-2 p-4 border-t border-gray-700">
+                <div className="modal-actions grid grid-cols-2 gap-2 p-4 border-t border-gray-700">
+                    <button 
+                        className="modal-btn ref bg-teal-600 hover:bg-teal-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed" 
+                        onClick={onUseAsReference}
+                        disabled={isVideo}
+                    >🔄 Referência</button>
                     <button 
                         className="modal-btn edit bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed" 
                         onClick={onEdit}

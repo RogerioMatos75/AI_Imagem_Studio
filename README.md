@@ -17,7 +17,7 @@ O estúdio é dividido em dois modos principais: **Criar** e **Editar**, cada um
 5.  **💀 Esqueleto 3D**: Uma ferramenta poderosa para modeladores 3D. Gere folhas de personagem (character sheets) com vistas ortogonais (frente, costas, esquerda, direita) em uma pose-T perfeita, a partir de um prompt de texto ou de uma imagem de conceito existente.
 6.  **🧸 Miniatura**: Transforme uma imagem de referência em uma fotografia comercial de alta qualidade de uma miniatura em escala, com ambiente de estúdio e detalhes realistas.
 7.  **🧊 Colmap**: Otimizado para fotogrametria e NeRF. Gera uma imagem-chave (keyframe) cinematográfica e fotorrealista de um objeto sobre uma base com marcadores geométricos de alto contraste, ideal para rastreamento 3D.
-8.  **🎬 Animar Cena**: Leva a função Colmap um passo adiante, gerando um vídeo orbital de 7 segundos em 4K. A câmera gira 360 graus em torno do objeto de referência, com um leve desvio para criar um forte efeito de paralaxe, perfeito para pipelines de reconstrução 3D.
+8.  **🎬 Animar Cena**: Leva a função Colmap um passo adiante, gerando um vídeo orbital de 10 segundos em 4K e em formato quadrado (1:1). A câmera gira 360 graus em torno do objeto de referência, com um leve desvio para criar um forte efeito de paralaxe, perfeito para pipelines de reconstrução 3D.
 
 ### Modo Editar
 

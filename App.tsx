@@ -310,6 +310,35 @@ const App: React.FC = () => {
         }
     };
 
+    const handleUseAsReference = useCallback(() => {
+        if (!generatedImage) return;
+
+        const mimeTypeMatch = generatedImage.match(/data:(.*);base64,/);
+        if (!mimeTypeMatch) {
+            console.error("Could not determine mime type from generated image.");
+            setError("Não foi possível processar a imagem gerada para referência.");
+            return;
+        }
+        const mimeType = mimeTypeMatch[1];
+        const base64 = generatedImage.split(',')[1];
+        const newImageFile: ImageFile = { base64, mimeType };
+
+        setImage1(newImageFile);
+        setGeneratedImage(null);
+        setGeneratedVideo(null);
+        setError(null);
+        
+        if (lastCreateFunction === CreateFunction.Colmap) {
+            setCreateFunction(CreateFunction.Animate);
+        }
+        
+        setMode(Mode.Create);
+        
+        if (isModalOpen) {
+            setIsModalOpen(false);
+        }
+    }, [generatedImage, isModalOpen, lastCreateFunction]);
+
     return (
         <div className="w-full min-h-screen bg-gray-900 flex flex-col">
             <div className="flex flex-col md:flex-row w-full flex-grow">
@@ -340,6 +369,7 @@ const App: React.FC = () => {
                     createFunction={createFunction}
                     error={error}
                     onEditCurrentImage={handleEditCurrentImage}
+                    onUseAsReference={handleUseAsReference}
                     lastCreateFunction={lastCreateFunction}
                     lastPrompt={lastSuccessfulPrompt}
                     onGenerateOrthoView={handleGenerateOrthoView}
@@ -353,6 +383,7 @@ const App: React.FC = () => {
                 generatedImage={generatedImage}
                 generatedVideo={generatedVideo}
                 onEdit={handleEditCurrentImage}
+                onUseAsReference={handleUseAsReference}
                 onNew={() => {
                     resetToDefaults();
                     setIsModalOpen(false);
